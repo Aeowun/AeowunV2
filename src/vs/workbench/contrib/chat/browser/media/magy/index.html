@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Magy — Chat Only</title>
+    <link rel="stylesheet" id="magy-style-link">
+</head>
+<body>
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loader-m">M</div>
+    </div>
+    <div id="app" style="display: none;">
+        <section id="chat-panel" class="chat-panel">
+            <div class="panel-heading">
+                <div>
+                    <p class="eyebrow">MAGY V2</p>
+                    <h1 id="chat-title">Chat</h1>
+                </div>
+                <div id="relay-status"><span id="relay-dot" class="status-dot"></span> <span>Relay Ready</span></div>
+            </div>
+            <div id="chat-feed" class="chat-feed">
+                <div class="empty-state">
+                    <span class="empty-glyph">◌</span>
+                    <h2>Direct Line Active</h2>
+                    <p>Type a message below to interact with the relay.</p>
+                </div>
+            </div>
+            <form id="chat-form" class="chat-composer">
+                <textarea id="chat-input" rows="1" autocomplete="off" placeholder="Message Magy..."></textarea>
+                <button class="button primary" type="submit">Send</button>
+            </form>
+            <div class="model-badge">GPT-5.6 Luna</div>
+        </section>
+        <div id="toast-region" class="toast-region"></div>
+    </div>
+    <script id="magy-app-script"></script>
+</body>
+</html>
