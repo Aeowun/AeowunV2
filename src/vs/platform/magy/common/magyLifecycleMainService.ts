@@ -11,4 +11,6 @@ export interface IMagyLifecycleMainService {
 	readonly _serviceBrand: undefined;
 	startMagy(): Promise<void>;
 	getSessionToken(): Promise<string>;
+	sendToRelay(text: string): Promise<string>;
+	getInitialGreeting(): Promise<string | null>;
 }

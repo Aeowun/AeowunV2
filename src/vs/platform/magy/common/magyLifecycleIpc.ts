@@ -18,6 +18,8 @@ export class MagyLifecycleChannel implements IServerChannel {
 		switch (command) {
 			case 'startMagy': return this.service.startMagy();
 			case 'getSessionToken': return this.service.getSessionToken();
+			case 'sendToRelay': return this.service.sendToRelay(arg);
+			case 'getInitialGreeting': return this.service.getInitialGreeting();
 		}
 
 		throw new Error(`Command not found: ${command}`);
@@ -35,5 +37,13 @@ export class MagyLifecycleChannelClient implements IMagyLifecycleMainService {
 
 	getSessionToken(): Promise<string> {
 		return this.channel.call('getSessionToken');
+	}
+
+	sendToRelay(text: string): Promise<string> {
+		return this.channel.call('sendToRelay', text);
+	}
+
+	getInitialGreeting(): Promise<string | null> {
+		return this.channel.call('getInitialGreeting');
 	}
 }

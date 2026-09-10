@@ -13,8 +13,6 @@ import { IThemeService } from '../../../../platform/theme/common/themeService.js
 import { IViewDescriptorService } from '../../../common/views.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
 import { IChatService } from '../common/chatService/chatService.js';
-import { LocalChatSessionUri } from '../common/model/chatUri.js';
-import { ChatAgentLocation } from '../common/constants.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { ILanguageModelsService } from '../common/languageModels.js';
 import { WebviewViewPane } from '../../webviewView/browser/webviewViewPane.js';
@@ -75,14 +73,11 @@ export class MagyChatViewPane extends WebviewViewPane {
 		const webview = (this as any)._webview.value as IWebview;
 		if (!webview) { return; }
 
-		// Configure webview content options to allow local resources
+		// Configure webview content options
 		webview.contentOptions = {
 			allowScripts: true,
 			localResourceRoots: [
 				FileAccess.asFileUri('vs/workbench/contrib/chat/browser/media/magy')
-			],
-			portMapping: [
-				{ webviewPort: 3000, extensionHostPort: 3000 }
 			]
 		};
 
@@ -97,28 +92,28 @@ export class MagyChatViewPane extends WebviewViewPane {
 
 		webview.setHtml(this._getHtml(token, webviewGenericCspSource));
 
-		this._register(webview.onMessage((e: any) => {
+		this._register(webview.onMessage(async (e: any) => {
 			if (e.message.command === 'chat') {
-				this._handleChat(e.message.text);
+				const text = e.message.text;
+				this.logService.info('[MAGY] UI Request:', text);
+
+				// Show user bubble immediately
+				webview.postMessage({ type: 'ChatUpdate', data: { role: 'user', content: text } });
+
+				try {
+					const response = await client.sendToRelay(text);
+					webview.postMessage({ type: 'ChatUpdate', data: { role: 'magy', content: response } });
+				} catch (err: any) {
+					this.logService.error('[MAGY] Relay error:', err);
+					webview.postMessage({ type: 'Error', data: err.message });
+				}
+			} else if (e.message.command === 'ui-ready') {
+				const greeting = await client.getInitialGreeting();
+				if (greeting) {
+					webview.postMessage({ type: 'ChatUpdate', data: { role: 'magy', content: greeting } });
+				}
 			}
 		}));
-	}
-
-	private async _handleChat(text: string): Promise<void> {
-		this.logService.info('[Magy] Received chat request:', text);
-		const modelId = this.languageModelsService.getLanguageModelIds().find(id => id.startsWith('local/'))
-						|| 'local/magy';
-
-		const sessionUri = LocalChatSessionUri.forSession('magy-session');
-		try {
-			await this.chatService.sendRequest(sessionUri, text, {
-				agentId: 'local.chat',
-				userSelectedModelId: modelId,
-				location: ChatAgentLocation.Chat
-			});
-		} catch (error) {
-			this.logService.error('[Magy] Chat request failed:', error);
-		}
 	}
 
 	private _getHtml(sessionToken: string, cspSource: string): string {
@@ -131,7 +126,7 @@ export class MagyChatViewPane extends WebviewViewPane {
 			<head>
 				<meta charset="UTF-8">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src http://localhost:3000 http://127.0.0.1:3000; script-src ${cspSource} 'unsafe-inline'; style-src ${cspSource} 'unsafe-inline';">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https:; script-src ${cspSource} 'unsafe-inline'; style-src ${cspSource} 'unsafe-inline';">
 				<title>Magy</title>
 				<link rel="stylesheet" href="${styleUri}">
 				<script>
