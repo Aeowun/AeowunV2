@@ -79,6 +79,14 @@ body {
     border: 1px solid var(--border);
 }
 
+.chat-bubble.thinking {
+    align-self: flex-start;
+    background: color-mix(in srgb, var(--surface) 50%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--border) 50%, transparent);
+    color: color-mix(in srgb, var(--text) 70%, transparent);
+    font-style: italic;
+}
+
 .chat-composer {
     display: flex;
     gap: 8px;

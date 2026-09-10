@@ -28,6 +28,8 @@ import { IMainProcessService } from '../../../../platform/ipc/common/mainProcess
 import { MagyLifecycleChannelClient } from '../../../../platform/magy/common/magyLifecycleIpc.js';
 import { asWebviewUri, webviewGenericCspSource } from '../../webview/common/webview.js';
 import { FileAccess } from '../../../../base/common/network.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 
 export class MagyChatViewPane extends WebviewViewPane {
 
@@ -55,6 +57,8 @@ export class MagyChatViewPane extends WebviewViewPane {
 		@ILogService private readonly logService: ILogService,
 		@ILanguageModelsService private readonly languageModelsService: ILanguageModelsService,
 		@IMainProcessService private readonly mainProcessService: IMainProcessService,
+		@IEditorService private readonly editorService: IEditorService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 	) {
 		super(options, configurationService, contextKeyService, contextMenuService, instantiationService, keybindingService, openerService, hoverService, themeService, viewDescriptorService, activityService, extensionService, progressService, storageService, viewService, webviewService, webviewViewService);
 	}
@@ -92,6 +96,11 @@ export class MagyChatViewPane extends WebviewViewPane {
 
 		webview.setHtml(this._getHtml(token, webviewGenericCspSource));
 
+		this._register(client.onDidRelayMessage(msg => {
+			// Forward raw relay messages to the webview
+			webview.postMessage({ type: 'RelayEvent', data: msg });
+		}));
+
 		this._register(webview.onMessage(async (e: any) => {
 			if (e.message.command === 'chat') {
 				const text = e.message.text;
@@ -100,8 +109,11 @@ export class MagyChatViewPane extends WebviewViewPane {
 				// Show user bubble immediately
 				webview.postMessage({ type: 'ChatUpdate', data: { role: 'user', content: text } });
 
+				// Gather context
+				const context = this._gatherContext();
+
 				try {
-					const response = await client.sendToRelay(text);
+					const response = await client.sendToRelay(text, context);
 					webview.postMessage({ type: 'ChatUpdate', data: { role: 'magy', content: response } });
 				} catch (err: any) {
 					this.logService.error('[MAGY] Relay error:', err);
@@ -114,6 +126,38 @@ export class MagyChatViewPane extends WebviewViewPane {
 				}
 			}
 		}));
+	}
+
+	private _gatherContext(): any {
+		const context: any = {};
+
+		// 1. Workspace Context
+		const workspace = this.workspaceContextService.getWorkspace();
+		if (workspace.folders.length > 0) {
+			context.workspace = {
+				name: workspace.folders[0].name,
+				folders: workspace.folders.map(f => f.name)
+			};
+		}
+
+		// 2. Editor Context
+		const activeEditor = this.editorService.activeTextEditorControl;
+		if (activeEditor && (activeEditor as any).getModel) {
+			const model = (activeEditor as any).getModel();
+			if (model) {
+				const selection = activeEditor.getSelection();
+				context.editor = {
+					path: model.uri.fsPath || model.uri.path,
+					language: model.getLanguageId(),
+					// Only send selection if it's not empty, otherwise full file if reasonable
+					selection: selection && !selection.isEmpty() ? model.getValueInRange(selection) : null,
+					content: model.getValueLength() < 50000 ? model.getValue() : null, // Limit to ~50k chars for safety
+					isFullContent: !selection || selection.isEmpty()
+				};
+			}
+		}
+
+		return Object.keys(context).length > 0 ? context : null;
 	}
 
 	private _getHtml(sessionToken: string, cspSource: string): string {

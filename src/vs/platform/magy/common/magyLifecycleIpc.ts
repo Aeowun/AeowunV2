@@ -11,6 +11,9 @@ export class MagyLifecycleChannel implements IServerChannel {
 	constructor(private service: IMagyLifecycleMainService) { }
 
 	listen(_: unknown, event: string): Event<any> {
+		if (event === 'onDidRelayMessage') {
+			return this.service.onDidRelayMessage;
+		}
 		throw new Error(`Event not found: ${event}`);
 	}
 
@@ -18,7 +21,7 @@ export class MagyLifecycleChannel implements IServerChannel {
 		switch (command) {
 			case 'startMagy': return this.service.startMagy();
 			case 'getSessionToken': return this.service.getSessionToken();
-			case 'sendToRelay': return this.service.sendToRelay(arg);
+			case 'sendToRelay': return this.service.sendToRelay(arg.text, arg.context);
 			case 'getInitialGreeting': return this.service.getInitialGreeting();
 		}
 
@@ -31,6 +34,10 @@ export class MagyLifecycleChannelClient implements IMagyLifecycleMainService {
 
 	constructor(private channel: IChannel) { }
 
+	get onDidRelayMessage(): Event<any> {
+		return this.channel.listen('onDidRelayMessage');
+	}
+
 	startMagy(): Promise<void> {
 		return this.channel.call('startMagy');
 	}
@@ -39,8 +46,8 @@ export class MagyLifecycleChannelClient implements IMagyLifecycleMainService {
 		return this.channel.call('getSessionToken');
 	}
 
-	sendToRelay(text: string): Promise<string> {
-		return this.channel.call('sendToRelay', text);
+	sendToRelay(text: string, context?: any): Promise<string> {
+		return this.channel.call('sendToRelay', { text, context });
 	}
 
 	getInitialGreeting(): Promise<string | null> {

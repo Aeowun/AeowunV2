@@ -22,6 +22,16 @@ const UI = {
         this.log("Initialized.");
     },
 
+    ensureThinkingBubble() {
+        if (document.getElementById('thinking-bubble')) return;
+        this.appendChatBubble('thinking', 'MAGY is thinking...');
+    },
+
+    removeThinkingBubble() {
+        const bubble = document.getElementById('thinking-bubble');
+        if (bubble) bubble.remove();
+    },
+
     log(msg) { console.log(`[MAGY] ${msg}`); },
 
     cacheElements() {
@@ -63,13 +73,22 @@ const UI = {
         window.addEventListener('message', event => {
             const message = event.data;
             if (message.type === 'ChatUpdate') {
+                this.removeThinkingBubble();
                 this.appendChatBubble(message.data.role, message.data.content);
                 if (message.data.role === 'magy') {
                     this.setBusy(false);
                 }
             } else if (message.type === 'Error') {
+                this.removeThinkingBubble();
                 this.appendChatBubble('magy', `⚠️ ${message.data}`);
                 this.setBusy(false);
+            } else if (message.type === 'RelayEvent') {
+                const relayMsg = message.data;
+                if (relayMsg.type === 'status' && relayMsg.status === 'working') {
+                    this.ensureThinkingBubble();
+                } else if (relayMsg.type === 'text' || relayMsg.type === 'error' || relayMsg.type === 'response_end') {
+                    this.removeThinkingBubble();
+                }
             }
         });
 
@@ -95,7 +114,10 @@ const UI = {
         if (role === 'magy') this.dismissLoading();
 
         const bubble = document.createElement('div');
-        bubble.className = `chat-bubble ${role === 'user' ? 'user' : 'magy'}`;
+        bubble.className = `chat-bubble ${role === 'user' ? 'user' : (role === 'thinking' ? 'thinking' : 'magy')}`;
+        if (role === 'thinking') {
+            bubble.id = 'thinking-bubble';
+        }
         bubble.textContent = text;
 
         const empty = this.chatFeed.querySelector('.empty-state');
@@ -115,6 +137,7 @@ const UI = {
 
         this.chatInput.value = '';
         this.setBusy(true);
+        this.ensureThinkingBubble();
 
         if (vscode) {
             vscode.postMessage({ command: 'chat', text: text });
